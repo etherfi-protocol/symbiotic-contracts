@@ -3,6 +3,8 @@ pragma solidity 0.8.25;
 
 import {Script, console2} from "forge-std/Script.sol";
 
+import {Vault} from "../../src/contracts/vault/Vault.sol";
+
 import {IMigratablesFactory} from "../../src/interfaces/common/IMigratablesFactory.sol";
 import {IVault} from "../../src/interfaces/vault/IVault.sol";
 import {IVaultConfigurator} from "../../src/interfaces/IVaultConfigurator.sol";
@@ -10,6 +12,8 @@ import {IBaseDelegator} from "../../src/interfaces/delegator/IBaseDelegator.sol"
 import {INetworkRestakeDelegator} from "../../src/interfaces/delegator/INetworkRestakeDelegator.sol";
 import {IFullRestakeDelegator} from "../../src/interfaces/delegator/IFullRestakeDelegator.sol";
 import {IOperatorSpecificDelegator} from "../../src/interfaces/delegator/IOperatorSpecificDelegator.sol";
+import {IBaseSlasher} from "../../src/interfaces/slasher/IBaseSlasher.sol";
+import {ISlasher} from "../../src/interfaces/slasher/ISlasher.sol";
 import {IVetoSlasher} from "../../src/interfaces/slasher/IVetoSlasher.sol";
 
 // Copy of Vault.s.sol but made it easier to set all the parameters + comments
@@ -22,18 +26,22 @@ contract VaultHelper is Script {
         address owner = address(0xD0d7F8a5a86d8271ff87ff24145Cf40CEa9F7A39);
 
         // symbiotic provided helper contract to help initializing all the vault params
-        address vaultConfigurator = address(0x382e9c6fF81F07A566a8B0A3622dc85c47a891Df);
+        // This will be different on different networks / testnets / devnets
+        address vaultConfigurator = address(0xD2191FE92987171691d552C219b8caEf186eb9cA);
 
         // collateral wrappers can be deployed with the appropriate DefaultCollateralFactory contract for your target chain
-        address collateral = address(0x1C495D4D20444Eb78E0026335cd5CFbD805ceD12);
+        address collateral = address(0xBC9fD18dc74059E208a185889E364ECF554B873E);
 
         // slashing is only valid for one epoch. We will need to work with networks to figure out what kind of values they want
-        uint48 epochDuration = 42069; // TODO
+        // when withdrawing, you will wait a minimum of 1 vault epoch and a maximum of 2 vault epochs.
+        uint48 epochDuration = 604800; // 7 days in seconds
 
         // do we want to allow only certain addresses to deposit
         bool depositWhitelist = false;
+        address[] memory whitelistedDepositors;
 
         // do we want a maximum amount of collateral that can be deposited? Set to 0 if no limit
+        // Never Enough!!!
         uint256 depositLimit = 0;
 
         // Do we want to specify a...
@@ -43,20 +51,57 @@ contract VaultHelper is Script {
         uint64 delegatorIndex = 0;
 
         // do we want a dedicated slasher contract
-        bool withSlasher = false; // TODO: deploy a slasher
+        bool withSlasher = true;
         uint64 slasherIndex = 1; // 1 for VetoSlasher
-        uint48 vetoDuration = 100000; // TODO: what vetoDuration do networks want?
+        uint48 vetoDuration = 172800; // 2 days in seconds. Symbiotic recommends this value to be substantially lower than the vault epoch
 
-        // set roles that can perform certain key actions on the vault
-        // Leave these arrays empty if you want no one to be able to perform the action
-        address[] memory networkLimitSetRoleHolders = new address[](1);
+        // Burner address. We can set this to the address of a contract if we need custom behavior
+        address burner = address(0x0);
+        bool isBurnerHook = false; // We need to toggle this on if we want a contract that has an on-slash callback
+
+        // slashing callback. If we wish to use one of the premade hooks we should deploy them beforehand
+        // https://github.com/symbioticfi/hooks/tree/main/test/networkRestakeDelegator
+        address hook;
+
+        uint256 deployerKey = vm.envUint("PRIVATE_KEY");
+        address deployer = vm.addr(deployerKey);
+        vm.startBroadcast(deployerKey);
+
+        ///////////////////////////////////////////////////////////////////////////////
+        ////////////////////////  BEGIN ORIGINAL SCRIPT ///////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////////
+
+        bytes memory vaultParams = abi.encode(
+            IVault.InitParams({
+                collateral: collateral,
+                burner: burner,
+                epochDuration: epochDuration,
+                depositWhitelist: depositWhitelist,
+                isDepositLimit: depositLimit != 0,
+                depositLimit: depositLimit,
+                defaultAdminRoleHolder: depositWhitelist ? deployer : owner,
+                depositWhitelistSetRoleHolder: owner,
+                depositorWhitelistRoleHolder: owner,
+                isDepositLimitSetRoleHolder: owner,
+                depositLimitSetRoleHolder: owner
+            })
+        );
+
+        uint256 roleHolders = 1;
+        if (hook != address(0) && hook != owner) {
+            roleHolders = 2;
+        }
+        address[] memory networkLimitSetRoleHolders = new address[](roleHolders);
+        address[] memory operatorNetworkLimitSetRoleHolders = new address[](roleHolders);
+        address[] memory operatorNetworkSharesSetRoleHolders = new address[](roleHolders);
         networkLimitSetRoleHolders[0] = owner;
-        address[] memory operatorNetworkLimitSetRoleHolders = new address[](1);
         operatorNetworkLimitSetRoleHolders[0] = owner;
-        address[] memory operatorNetworkSharesSetRoleHolders = new address[](1);
         operatorNetworkSharesSetRoleHolders[0] = owner;
-
-        vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
+        if (roleHolders > 1) {
+            networkLimitSetRoleHolders[1] = hook;
+            operatorNetworkLimitSetRoleHolders[1] = hook;
+            operatorNetworkSharesSetRoleHolders[1] = hook;
+        }
 
         bytes memory delegatorParams;
         if (delegatorIndex == 0) {
@@ -64,7 +109,7 @@ contract VaultHelper is Script {
                 INetworkRestakeDelegator.InitParams({
                     baseParams: IBaseDelegator.BaseParams({
                         defaultAdminRoleHolder: owner,
-                        hook: address(0),
+                        hook: hook,
                         hookSetRoleHolder: owner
                     }),
                     networkLimitSetRoleHolders: networkLimitSetRoleHolders,
@@ -76,7 +121,7 @@ contract VaultHelper is Script {
                 IFullRestakeDelegator.InitParams({
                     baseParams: IBaseDelegator.BaseParams({
                         defaultAdminRoleHolder: owner,
-                        hook: address(0),
+                        hook: hook,
                         hookSetRoleHolder: owner
                     }),
                     networkLimitSetRoleHolders: networkLimitSetRoleHolders,
@@ -88,7 +133,7 @@ contract VaultHelper is Script {
                 IOperatorSpecificDelegator.InitParams({
                     baseParams: IBaseDelegator.BaseParams({
                         defaultAdminRoleHolder: owner,
-                        hook: address(0),
+                        hook: hook,
                         hookSetRoleHolder: owner
                     }),
                     networkLimitSetRoleHolders: networkLimitSetRoleHolders,
@@ -98,29 +143,25 @@ contract VaultHelper is Script {
         }
 
         bytes memory slasherParams;
-        if (slasherIndex == 1) {
-            slasherParams = abi.encode(IVetoSlasher.InitParams({vetoDuration: vetoDuration, resolverSetEpochsDelay: 3}));
+        if (slasherIndex == 0) {
+            slasherParams = abi.encode(
+                ISlasher.InitParams({baseParams: IBaseSlasher.BaseParams({isBurnerHook: isBurnerHook})})
+            );
+        } else if (slasherIndex == 1) {
+            slasherParams = abi.encode(
+                IVetoSlasher.InitParams({
+                    baseParams: IBaseSlasher.BaseParams({isBurnerHook: isBurnerHook}),
+                    vetoDuration: vetoDuration,
+                    resolverSetEpochsDelay: 3
+                })
+            );
         }
 
         (address vault_, address delegator_, address slasher_) = IVaultConfigurator(vaultConfigurator).create(
             IVaultConfigurator.InitParams({
-                version: IMigratablesFactory(IVaultConfigurator(vaultConfigurator).VAULT_FACTORY()).lastVersion(),
+                version: 1,
                 owner: owner,
-                vaultParams: abi.encode(
-                    IVault.InitParams({
-                        collateral: address(collateral),
-                        burner: address(0xdEaD),
-                        epochDuration: epochDuration,
-                        depositWhitelist: depositWhitelist,
-                        isDepositLimit: depositLimit != 0,
-                        depositLimit: depositLimit,
-                        defaultAdminRoleHolder: owner,
-                        depositWhitelistSetRoleHolder: owner,
-                        depositorWhitelistRoleHolder: owner,
-                        isDepositLimitSetRoleHolder: owner,
-                        depositLimitSetRoleHolder: owner
-                    })
-                ),
+                vaultParams: vaultParams,
                 delegatorIndex: delegatorIndex,
                 delegatorParams: delegatorParams,
                 withSlasher: withSlasher,
@@ -128,6 +169,18 @@ contract VaultHelper is Script {
                 slasherParams: slasherParams
             })
         );
+
+        if (depositWhitelist) {
+            Vault(vault_).grantRole(Vault(vault_).DEFAULT_ADMIN_ROLE(), owner);
+            Vault(vault_).grantRole(Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
+
+            for (uint256 i; i < whitelistedDepositors.length; ++i) {
+                Vault(vault_).setDepositorWhitelistStatus(whitelistedDepositors[i], true);
+            }
+
+            Vault(vault_).renounceRole(Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
+            Vault(vault_).renounceRole(Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
+        }
 
         console2.log("Vault: ", vault_);
         console2.log("Delegator: ", delegator_);
