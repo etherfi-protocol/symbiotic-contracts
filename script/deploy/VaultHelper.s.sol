@@ -56,8 +56,8 @@ contract VaultHelper is Script {
         uint48 vetoDuration = 172800; // 2 days in seconds. Symbiotic recommends this value to be substantially lower than the vault epoch
 
         // Burner address. We can set this to the address of a contract if we need custom behavior
-        address burner = address(0x0);
-        bool isBurnerHook = false; // We need to toggle this on if we want a contract that has an on-slash callback
+        address burner = address(0x5C4D89951f396029A7d411813Ce91F09D83bdb71);
+        bool isBurnerHook = true; // We need to toggle this on if we want a contract that has an on-slash callback
 
         // slashing callback. If we wish to use one of the premade hooks we should deploy them beforehand
         // https://github.com/symbioticfi/hooks/tree/main/test/networkRestakeDelegator
