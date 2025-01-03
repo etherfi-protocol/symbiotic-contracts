@@ -19,7 +19,9 @@ import {IVetoSlasher} from "../../src/interfaces/slasher/IVetoSlasher.sol";
 // Copy of Vault.s.sol but made it easier to set all the parameters + comments
 contract VaultHelper is Script {
 
-
+    /**
+    *  source .env && forge script script/deploy/VaultHelper.s.sol:VaultHelper --rpc-url $ETH_RPC_URL --private-key $PRIVATE_KEY --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY
+    */
     function run() public {
 
         // who owns the vault
@@ -56,7 +58,7 @@ contract VaultHelper is Script {
         uint48 vetoDuration = 172800; // 2 days in seconds. Symbiotic recommends this value to be substantially lower than the vault epoch
 
         // Burner router address; deployed by `DeployBurnerRouter.s.sol`
-        address burner = address(0xe1c2aC2d79F63771A573b288907D0Cc1e04B2346);
+        address burner = address(0xFE0DcDd3Ee8e7EFE18D876BEEB41413Daf4023eB);
         bool isBurnerHook = true; // We need to toggle this on if we want a contract that has an on-slash callback
 
         // slashing callback. If we wish to use one of the premade hooks we should deploy them beforehand

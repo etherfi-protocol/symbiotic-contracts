@@ -13,8 +13,8 @@ contract BurnerRouterScript is Script {
     */
     function run() public {
         
-        // holesky deployed burner router
-        address burnerRouterFactory = address(0x80154294963b0D81011706cc7f90bec6b7A68852);
+        // symbiotic pre deployed factory contract on holesky
+        address burnerRouterFactory = address(0x32e2AfbdAffB1e675898ABA75868d92eE1E68f3b);
 
         // manager of the routers receivers
         address owner = address(0xD0d7F8a5a86d8271ff87ff24145Cf40CEa9F7A39);
