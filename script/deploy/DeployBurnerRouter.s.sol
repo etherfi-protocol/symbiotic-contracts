@@ -28,8 +28,15 @@ contract BurnerRouterScript is Script {
         // default destination for slashed funds
         address globalReceiver = address(0x0);
 
-        // to set slashers on a more granular level (don't set and use the default receiver)
-        IBurnerRouter.NetworkReceiver[] memory networkReceivers = new IBurnerRouter.NetworkReceiver[](0);
+        // to set slashers on a more granular level
+        IBurnerRouter.NetworkReceiver[] memory networkReceivers = new IBurnerRouter.NetworkReceiver[](1);
+
+        // setting required receiver for primev
+        networkReceivers[0] = IBurnerRouter.NetworkReceiver({
+            network: address(0x4535bd6fF24860b5fd2889857651a85fb3d3C6b1),
+            receiver: address(0x4535bd6fF24860b5fd2889857651a85fb3d3C6b1)
+        });
+
         IBurnerRouter.OperatorNetworkReceiver[] memory operatorNetworkReceivers = new IBurnerRouter.OperatorNetworkReceiver[](0);
 
         vm.startBroadcast();
