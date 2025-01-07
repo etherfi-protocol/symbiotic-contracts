@@ -31,10 +31,10 @@ contract BurnerRouterScript is Script {
         // to set slashers on a more granular level
         IBurnerRouter.NetworkReceiver[] memory networkReceivers = new IBurnerRouter.NetworkReceiver[](1);
 
-        // setting required receiver for primev
+        // setting receivers for networks that require them
         networkReceivers[0] = IBurnerRouter.NetworkReceiver({
-            network: address(0x4535bd6fF24860b5fd2889857651a85fb3d3C6b1),
-            receiver: address(0x4535bd6fF24860b5fd2889857651a85fb3d3C6b1)
+            network: address(0x0),
+            receiver: address(0x0)
         });
 
         IBurnerRouter.OperatorNetworkReceiver[] memory operatorNetworkReceivers = new IBurnerRouter.OperatorNetworkReceiver[](0);
