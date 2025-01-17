@@ -57,11 +57,11 @@ contract VaultHelper is Script {
 
         // Burner address. We can set this to the address of a contract if we need custom behavior
         address burner = address(0x0);
-        bool isBurnerHook = false; // We need to toggle this on if we want a contract that has an on-slash callback
+        bool isBurnerHook = false; // We need to toggle this on if we want a burner that has an on-slash callback
 
         // slashing callback. If we wish to use one of the premade hooks we should deploy them beforehand
         // https://github.com/symbioticfi/hooks/tree/main/test/networkRestakeDelegator
-        address hook;
+        address hook = address(0x0c3653aEB6740cBd6A53a34EC9a2FF4E7A1F1405);
 
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerKey);
